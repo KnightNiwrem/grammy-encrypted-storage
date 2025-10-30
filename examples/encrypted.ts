@@ -1,5 +1,5 @@
 /**
- * Example: Using EncryptedStorageAdapter with the vault plugin
+ * Example: Using EncryptedStorageAdapter with grammY sessions
  *
  * This example demonstrates how to use encrypted storage with grammY.
  * Data is automatically encrypted before being written to storage and
@@ -9,14 +9,8 @@
  * BOT_TOKEN="your-token" deno run --allow-net --allow-env examples/encrypted.ts
  */
 
-import { Bot, MemorySessionStorage } from "grammy";
-import {
-  EncryptedStorageAdapter,
-  vault,
-  type VaultData,
-  type VaultEntry,
-  type VaultFlavor,
-} from "../src/mod.ts";
+import { Bot, Context, MemorySessionStorage, session } from "grammy";
+import { EncryptedStorageAdapter } from "../src/mod.ts";
 
 // Get bot token from environment
 const token = Deno.env.get("BOT_TOKEN");
@@ -25,114 +19,89 @@ if (!token) {
   Deno.exit(1);
 }
 
+// Define session data structure
+interface SessionData {
+  counter: number;
+  notes: string[];
+}
+
 // Type for our bot context
-type MyContext = VaultFlavor;
+interface MyContext extends Context {
+  session: SessionData;
+}
 
 // Create bot
 const bot = new Bot<MyContext>(token);
 
 // Create encrypted storage
 // In production, store the password securely (e.g., in environment variables)
-const encryptedStorage = new EncryptedStorageAdapter<VaultData>({
+const encryptedStorage = new EncryptedStorageAdapter<SessionData>({
   storage: new MemorySessionStorage<string>(),
   password: Deno.env.get("ENCRYPTION_PASSWORD") || "demo-password-change-me",
-  salt: "grammy-vault-demo",
+  salt: "grammy-session-demo",
 });
 
-// Install vault plugin with encrypted storage
-bot.use(vault({
+// Install session middleware with encrypted storage
+bot.use(session({
+  initial: (): SessionData => ({ counter: 0, notes: [] }),
   storage: encryptedStorage,
 }));
 
 // Command: /start
 bot.command("start", (ctx) => {
   ctx.reply(
-    "🔐 Welcome to the Encrypted Text Vault Bot!\n\n" +
-      "Your data is encrypted at rest using AES-GCM.\n\n" +
+    "🔐 Welcome to the Encrypted Session Bot!\n\n" +
+      "Your session data is encrypted at rest using AES-GCM.\n\n" +
       "Commands:\n" +
-      "/save <text> - Save text to your vault\n" +
-      "/list - List all your vault entries\n" +
-      "/delete <id> - Delete an entry (use short ID)\n" +
-      "/clear - Clear your entire vault\n" +
-      "/count - Count your vault entries",
+      "/count - Increment and show counter\n" +
+      "/note <text> - Add a note to your session\n" +
+      "/notes - List all your notes\n" +
+      "/clear - Clear all session data",
   );
-});
-
-// Command: /save <text>
-bot.command("save", (ctx) => {
-  const text = ctx.match.trim();
-  if (!text) {
-    return ctx.reply(
-      "❌ Please provide text to save!\n\nExample: /save My secret note",
-    );
-  }
-
-  const entry: VaultEntry = {
-    id: crypto.randomUUID(),
-    text,
-    createdAt: Date.now(),
-  };
-
-  ctx.vault.entries.push(entry);
-
-  // Show short ID for easier deletion
-  const shortId = entry.id.split("-")[0];
-  ctx.reply(
-    `✅ Saved and encrypted!\n\n` +
-      `ID: ${shortId}\n` +
-      `Entry ${ctx.vault.entries.length} of your vault`,
-  );
-});
-
-// Command: /list
-bot.command("list", (ctx) => {
-  const entries = ctx.vault.entries;
-
-  if (entries.length === 0) {
-    return ctx.reply("📭 Your vault is empty!\n\nUse /save to add entries.");
-  }
-
-  const list = entries.map((entry, index) => {
-    const shortId = entry.id.split("-")[0];
-    const date = new Date(entry.createdAt).toLocaleDateString();
-    return `${index + 1}. ${entry.text}\n   📅 ${date} | 🆔 ${shortId}`;
-  }).join("\n\n");
-
-  ctx.reply(`🔐 Your encrypted vault (${entries.length} entries):\n\n${list}`);
-});
-
-// Command: /delete <id>
-bot.command("delete", (ctx) => {
-  const idPrefix = ctx.match.trim();
-  if (!idPrefix) {
-    return ctx.reply(
-      "❌ Please provide the entry ID!\n\nExample: /delete abc123",
-    );
-  }
-
-  const index = ctx.vault.entries.findIndex((e) => e.id.startsWith(idPrefix));
-  if (index === -1) {
-    return ctx.reply(`❌ Entry not found!\n\nUse /list to see all entries.`);
-  }
-
-  ctx.vault.entries.splice(index, 1);
-  ctx.reply(
-    `✅ Entry deleted!\n\n${ctx.vault.entries.length} entries remaining.`,
-  );
-});
-
-// Command: /clear
-bot.command("clear", (ctx) => {
-  const count = ctx.vault.entries.length;
-  ctx.vault.entries = [];
-  ctx.reply(`✅ Vault cleared!\n\n${count} entries removed.`);
 });
 
 // Command: /count
 bot.command("count", (ctx) => {
-  const count = ctx.vault.entries.length;
-  const plural = count === 1 ? "entry" : "entries";
-  ctx.reply(`📊 You have ${count} ${plural} in your encrypted vault.`);
+  ctx.session.counter++;
+  ctx.reply(
+    `🔢 Counter: ${ctx.session.counter}\n\n` +
+      `This value is encrypted in storage!`,
+  );
+});
+
+// Command: /note <text>
+bot.command("note", (ctx) => {
+  const text = ctx.match.trim();
+  if (!text) {
+    return ctx.reply(
+      "❌ Please provide text for the note!\n\nExample: /note Remember this",
+    );
+  }
+
+  ctx.session.notes.push(text);
+  ctx.reply(
+    `✅ Note saved and encrypted!\n\n` +
+      `You now have ${ctx.session.notes.length} note(s).`,
+  );
+});
+
+// Command: /notes
+bot.command("notes", (ctx) => {
+  const notes = ctx.session.notes;
+
+  if (notes.length === 0) {
+    return ctx.reply("📭 You have no notes yet!\n\nUse /note to add one.");
+  }
+
+  const list = notes.map((note, index) => `${index + 1}. ${note}`).join("\n");
+  ctx.reply(`📝 Your encrypted notes (${notes.length}):\n\n${list}`);
+});
+
+// Command: /clear
+bot.command("clear", (ctx) => {
+  ctx.session.counter = 0;
+  ctx.session.notes = [];
+  ctx.reply("✅ Session cleared! All encrypted data removed.");
 });
 
 // Handle unknown commands

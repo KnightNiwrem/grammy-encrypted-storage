@@ -1,9 +1,8 @@
 /**
  * grammY Encrypted Storage - Enhanced StorageAdapter with Encryption
  *
- * This plugin provides an encrypted storage adapter that wraps any existing
- * StorageAdapter to add encryption/decryption capabilities. It also includes
- * a text vault plugin demonstrating usage of encrypted storage.
+ * This module provides an encrypted storage adapter that wraps any existing
+ * StorageAdapter to add encryption/decryption capabilities.
  *
  * @module
  */
@@ -16,11 +15,4 @@ export {
   type EncryptionProvider,
 } from "./encryption.ts";
 
-export { vault } from "./plugin.ts";
-export type {
-  VaultData,
-  VaultEntry,
-  VaultFlavor,
-  VaultOptions,
-} from "./plugin.ts";
 export type { StorageAdapter } from "grammy";

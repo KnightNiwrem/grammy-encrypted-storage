@@ -16,19 +16,24 @@ An enhanced storage adapter for the grammY framework that adds encryption to any
 ### Basic Usage with Default Encryption
 
 ```typescript
-import { Bot, MemorySessionStorage } from "grammy";
+import { Bot, Context, MemorySessionStorage, session } from "grammy";
 import { EncryptedStorageAdapter } from "./src/mod.ts";
 
 const bot = new Bot("YOUR_BOT_TOKEN");
 
+interface SessionData {
+  counter: number;
+}
+
 // Wrap any storage adapter with encryption
-const encryptedStorage = new EncryptedStorageAdapter({
+const encryptedStorage = new EncryptedStorageAdapter<SessionData>({
   storage: new MemorySessionStorage<string>(),
   password: "your-secret-password",
 });
 
-// Use with the vault plugin or session middleware
-bot.use(vault({
+// Use with session middleware
+bot.use(session({
+  initial: () => ({ counter: 0 }),
   storage: encryptedStorage,
 }));
 ```
@@ -58,57 +63,60 @@ const storage = new EncryptedStorageAdapter({
 });
 ```
 
-## Text Vault Example
+## Example Usage
 
-This plugin includes a complete "text vault" example demonstrating encrypted storage:
+This plugin includes a complete example demonstrating encrypted sessions:
 
 ```typescript
-import { Bot, MemorySessionStorage } from "grammy";
-import { EncryptedStorageAdapter, vault, type VaultData } from "./src/mod.ts";
+import { Bot, Context, MemorySessionStorage, session } from "grammy";
+import { EncryptedStorageAdapter } from "./src/mod.ts";
 
 const bot = new Bot("YOUR_BOT_TOKEN");
 
-// Use encrypted storage for the vault
-const encryptedStorage = new EncryptedStorageAdapter<VaultData>({
+interface SessionData {
+  counter: number;
+  notes: string[];
+}
+
+interface MyContext extends Context {
+  session: SessionData;
+}
+
+// Use encrypted storage for sessions
+const encryptedStorage = new EncryptedStorageAdapter<SessionData>({
   storage: new MemorySessionStorage<string>(),
   password: "my-secret-key",
 });
 
-bot.use(vault({
+bot.use(session({
+  initial: (): SessionData => ({ counter: 0, notes: [] }),
   storage: encryptedStorage,
 }));
 
-// Example: Save text to the vault
-bot.command("save", (ctx) => {
-  const text = ctx.match;
-  if (!text) return ctx.reply("Please provide text to save.");
-
-  ctx.vault.entries.push({
-    id: crypto.randomUUID(),
-    text,
-    createdAt: Date.now(),
-  });
-  ctx.reply("Saved to your vault!");
+// Example: Increment counter
+bot.command("count", (ctx) => {
+  ctx.session.counter++;
+  ctx.reply(`Counter: ${ctx.session.counter}`);
 });
 
-// Example: List all entries
-bot.command("list", (ctx) => {
-  if (ctx.vault.entries.length === 0) {
-    return ctx.reply("Your vault is empty.");
+// Example: Add note
+bot.command("note", (ctx) => {
+  const text = ctx.match.trim();
+  if (!text) return ctx.reply("Please provide text for the note.");
+
+  ctx.session.notes.push(text);
+  ctx.reply("Note saved and encrypted!");
+});
+
+// Example: List notes
+bot.command("notes", (ctx) => {
+  if (ctx.session.notes.length === 0) {
+    return ctx.reply("You have no notes yet.");
   }
-  const list = ctx.vault.entries
-    .map((e, i) => `${i + 1}. ${e.text}`)
+  const list = ctx.session.notes
+    .map((note, i) => `${i + 1}. ${note}`)
     .join("\n");
-  ctx.reply(`Your vault:\n\n${list}`);
-});
-
-// Example: Delete an entry
-bot.command("delete", (ctx) => {
-  const id = ctx.match;
-  const index = ctx.vault.entries.findIndex((e) => e.id.startsWith(id));
-  if (index === -1) return ctx.reply("Entry not found.");
-  ctx.vault.entries.splice(index, 1);
-  ctx.reply("Deleted!");
+  ctx.reply(`Your notes:\n\n${list}`);
 });
 
 bot.start();
@@ -164,7 +172,7 @@ const provider = new DefaultEncryptionProvider(
 
 ## Running the Example
 
-An example bot is provided in `example.ts`. To run it:
+An example bot is provided in `examples/encrypted.ts`. To run it:
 
 1. Set your bot token as an environment variable:
    ```bash
@@ -172,10 +180,10 @@ An example bot is provided in `example.ts`. To run it:
    ```
 2. Run the example file:
    ```bash
-   deno run --allow-net --allow-env example.ts
+   deno run --allow-net --allow-env examples/encrypted.ts
    ```
 
-The example bot supports the following commands: `/start`, `/save <text>`, `/list`, `/delete <id>`, `/clear`, and `/count`.
+The example bot supports encrypted session storage with commands: `/start`, `/count`, `/note <text>`, `/notes`, and `/clear`.
 
 ## Persistent Storage Examples
 
@@ -194,7 +202,7 @@ const encryptedPostgres = new EncryptedStorageAdapter({
   password: "encryption-key",
 });
 
-bot.use(vault({ storage: encryptedPostgres }));
+bot.use(session({ storage: encryptedPostgres }));
 
 // Redis with encryption
 import { RedisAdapter } from "@grammyjs/storage-redis";
@@ -204,7 +212,7 @@ const encryptedRedis = new EncryptedStorageAdapter({
   password: "encryption-key",
 });
 
-bot.use(vault({ storage: encryptedRedis }));
+bot.use(session({ storage: encryptedRedis }));
 
 // File System with encryption
 import { FileAdapter } from "@grammyjs/storage-file";
@@ -214,7 +222,7 @@ const encryptedFile = new EncryptedStorageAdapter({
   password: "encryption-key",
 });
 
-bot.use(vault({ storage: encryptedFile }));
+bot.use(session({ storage: encryptedFile }));
 ```
 
 ## Customization
@@ -243,29 +251,6 @@ const storage = new EncryptedStorageAdapter({
 });
 ```
 
-### Vault Data Structure
-
-You can modify the data structure stored by the plugin by editing the `VaultData` interface in `src/plugin.ts`.
-
-```typescript
-export interface VaultData {
-  entries: VaultEntry[];
-  // Add your own properties here
-}
-```
-
-### Storage Key
-
-By default, data is stored on a per-user basis. You can change this behavior by providing a `getStorageKey` function.
-
-```typescript
-// Store data per chat
-bot.use(vault({
-  storage: myStorage,
-  getStorageKey: (ctx) => ctx.chat?.id.toString(),
-}));
-```
-
 ## Development
 
 This project includes several Deno tasks to help with development:
@@ -281,13 +266,15 @@ This project includes several Deno tasks to help with development:
 ```
 .
 ├── src/
-│   ├── mod.ts          # Main exports
-│   └── plugin.ts       # Vault plugin implementation
+│   ├── mod.ts                # Main exports
+│   ├── encryption.ts         # Encryption interface and default implementation
+│   └── encrypted-adapter.ts  # Encrypted storage adapter
 ├── test/
-│   └── plugin_test.ts  # Test suite
-├── example.ts          # Example bot
-├── deno.json           # Deno configuration
-└── README.md           # This file
+│   └── encryption_test.ts    # Test suite
+├── examples/
+│   └── encrypted.ts          # Example bot
+├── deno.json                 # Deno configuration
+└── README.md                 # This file
 ```
 
 ## License
