@@ -67,6 +67,30 @@ describe("Encryption Provider", () => {
       expect(decrypted).toBe(original);
     });
 
+    it("should handle very large data (>64KB)", async () => {
+      const provider = new DefaultEncryptionProvider("test-password");
+      // Create a payload larger than 64KB to test chunked base64 encoding
+      const original = "Y".repeat(100000); // 100KB
+
+      const encrypted = await provider.encrypt(original);
+      const decrypted = await provider.decrypt(encrypted);
+
+      expect(decrypted).toBe(original);
+      expect(original.length).toBe(100000);
+    });
+
+    it("should handle extremely large data (>1MB)", async () => {
+      const provider = new DefaultEncryptionProvider("test-password");
+      // Create a payload larger than 1MB
+      const original = "Z".repeat(1500000); // 1.5MB
+
+      const encrypted = await provider.encrypt(original);
+      const decrypted = await provider.decrypt(encrypted);
+
+      expect(decrypted).toBe(original);
+      expect(original.length).toBe(1500000);
+    });
+
     it("should fail to decrypt with wrong password", async () => {
       const provider1 = new DefaultEncryptionProvider("password1");
       const provider2 = new DefaultEncryptionProvider("password2");

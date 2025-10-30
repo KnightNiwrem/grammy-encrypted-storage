@@ -45,6 +45,37 @@ const MIN_ITERATIONS = 310000;
 const DEFAULT_ITERATIONS = 310000;
 
 /**
+ * Safely converts a Uint8Array to a base64 string without blowing the stack.
+ * Uses chunking to handle large payloads (>64KB) that would cause
+ * String.fromCharCode(...array) to fail.
+ */
+function uint8ArrayToBase64(array: Uint8Array): string {
+  const CHUNK_SIZE = 32768; // 32KB chunks to stay well under stack limits
+  let binaryString = "";
+
+  for (let i = 0; i < array.length; i += CHUNK_SIZE) {
+    const chunk = array.subarray(i, Math.min(i + CHUNK_SIZE, array.length));
+    binaryString += String.fromCharCode(...chunk);
+  }
+
+  return btoa(binaryString);
+}
+
+/**
+ * Safely converts a base64 string to a Uint8Array.
+ */
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+
+  return bytes;
+}
+
+/**
  * Default encryption provider using Web Crypto API with AES-GCM.
  * Uses a password-based key derivation (PBKDF2) to generate encryption keys.
  */
@@ -129,7 +160,7 @@ export class DefaultEncryptionProvider implements EncryptionProvider {
     combined.set(iv, 0);
     combined.set(new Uint8Array(encrypted), iv.length);
 
-    return btoa(String.fromCharCode(...combined));
+    return uint8ArrayToBase64(combined);
   }
 
   async decrypt(encrypted: string): Promise<string> {
@@ -137,7 +168,7 @@ export class DefaultEncryptionProvider implements EncryptionProvider {
     const key = await this.key;
 
     // Decode base64
-    const combined = Uint8Array.from(atob(encrypted), (c) => c.charCodeAt(0));
+    const combined = base64ToUint8Array(encrypted);
 
     // Extract IV and encrypted data
     const iv = combined.slice(0, 12);
