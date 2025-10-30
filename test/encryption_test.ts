@@ -122,7 +122,7 @@ describe("Encryption Provider", () => {
     it("should accept custom iterations", async () => {
       const provider = new DefaultEncryptionProvider({
         password: "test-password",
-        iterations: 400000,
+        iterations: 700000,
       });
       const original = "Test data";
 
@@ -138,10 +138,10 @@ describe("Encryption Provider", () => {
           password: "test-password",
           iterations: 100000,
         });
-      }).toThrow(/at least 310000/i);
+      }).toThrow(/at least 600000/i);
     });
 
-    it("should default to 310000 iterations", async () => {
+    it("should default to 600000 iterations", async () => {
       const provider1 = new DefaultEncryptionProvider({
         password: "password",
         salt: "salt",
@@ -149,7 +149,7 @@ describe("Encryption Provider", () => {
       const provider2 = new DefaultEncryptionProvider({
         password: "password",
         salt: "salt",
-        iterations: 310000,
+        iterations: 600000,
       });
       const original = "Test data";
 
@@ -399,7 +399,7 @@ describe("EncryptedStorageAdapter", () => {
       const storage = new EncryptedStorageAdapter({
         storage: new MemorySessionStorage<string>(),
         password: "test",
-        iterations: 500000,
+        iterations: 700000,
       });
 
       await storage.write("key1", { data: "test" });
@@ -414,7 +414,7 @@ describe("EncryptedStorageAdapter", () => {
           password: "test",
           iterations: 100000,
         });
-      }).toThrow(/at least 310000/i);
+      }).toThrow(/at least 600000/i);
     });
   });
 });

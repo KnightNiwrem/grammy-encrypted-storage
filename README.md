@@ -135,7 +135,7 @@ interface EncryptedStorageOptions<T> {
   storage: StorageAdapter<string>; // Underlying storage adapter
   password?: string; // Password for default encryption
   salt?: string; // Optional salt for key derivation
-  iterations?: number; // Optional PBKDF2 iterations (default: 310000, min: 310000)
+  iterations?: number; // Optional PBKDF2 iterations (default: 600000, min: 600000)
   encryptionProvider?: EncryptionProvider; // Custom encryption implementation
 }
 ```
@@ -162,7 +162,7 @@ The default encryption implementation using AES-GCM with PBKDF2 key derivation:
 const provider = new DefaultEncryptionProvider({
   password: "your-password", // Required: encryption password
   salt: "custom-salt", // Optional: salt for key derivation
-  iterations: 400000, // Optional: PBKDF2 iterations (default: 310000, min: 310000)
+  iterations: 600000, // Optional: PBKDF2 iterations (default: 600000, min: 600000)
 });
 
 // Backward compatible: using positional parameters
@@ -175,11 +175,11 @@ const provider = new DefaultEncryptionProvider(
 **Security Features:**
 
 - AES-GCM 256-bit encryption
-- PBKDF2 key derivation with configurable iterations (default: 310000, min: 310000)
+- PBKDF2 key derivation with configurable iterations (default: 600000, min: 600000)
 - Random IV for each encryption operation
 - SHA-256 hashing
 
-**Recommended Iterations:** 310000-600000. Higher values provide better security but slower performance.
+**Recommended Iterations:** 600000 or higher based on latest OWASP recommendations (2023+). Higher values provide better security but slower performance.
 
 ## Running the Example
 

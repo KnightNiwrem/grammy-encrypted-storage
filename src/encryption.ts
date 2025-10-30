@@ -34,15 +34,15 @@ export interface DefaultEncryptionOptions {
 
   /**
    * Number of PBKDF2 iterations for key derivation.
-   * Must be at least 310000. Defaults to 310000.
+   * Must be at least 600000. Defaults to 600000.
    * Higher values provide better security but slower performance.
-   * Recommended range: 310000-600000.
+   * Recommended: 600000 or higher based on latest OWASP recommendations.
    */
   iterations?: number;
 }
 
-const MIN_ITERATIONS = 310000;
-const DEFAULT_ITERATIONS = 310000;
+const MIN_ITERATIONS = 600000;
+const DEFAULT_ITERATIONS = 600000;
 
 /**
  * Safely converts a Uint8Array to a base64 string without blowing the stack.

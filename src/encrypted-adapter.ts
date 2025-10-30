@@ -35,9 +35,9 @@ export interface EncryptedStorageOptions<T> {
   /**
    * Number of PBKDF2 iterations for key derivation.
    * Only used if encryptionProvider is not provided.
-   * Must be at least 310000. Defaults to 310000.
+   * Must be at least 600000. Defaults to 600000.
    * Higher values provide better security but slower performance.
-   * Recommended range: 310000-600000.
+   * Recommended: 600000 or higher based on latest OWASP recommendations.
    */
   iterations?: number;
 }
