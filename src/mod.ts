@@ -1,18 +1,23 @@
 /**
- * grammY Text Vault Plugin - A StorageAdapter-based Plugin Template
+ * grammY Encrypted Storage - Enhanced StorageAdapter with Encryption
  *
- * This plugin demonstrates how to build a grammY plugin that uses the
- * StorageAdapter interface for persistent data storage. It implements a
- * text vault where users can save, list, and delete text entries.
+ * This module provides an encrypted storage adapter that wraps any existing
+ * StorageAdapter to add encryption/decryption capabilities.
  *
  * @module
  */
 
-export { vault } from "./plugin.ts";
+export { EncryptedStorageAdapter } from "./encrypted-adapter.ts";
 export type {
-  VaultData,
-  VaultEntry,
-  VaultFlavor,
-  VaultOptions,
-} from "./plugin.ts";
+  EncryptedStorageOptions,
+  EncryptedStorageWithPasswordOptions,
+  EncryptedStorageWithProviderOptions,
+} from "./encrypted-adapter.ts";
+
+export {
+  type DefaultEncryptionOptions,
+  DefaultEncryptionProvider,
+  type EncryptionProvider,
+} from "./encryption.ts";
+
 export type { StorageAdapter } from "grammy";

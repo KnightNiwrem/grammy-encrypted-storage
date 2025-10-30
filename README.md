@@ -1,71 +1,201 @@
-# grammY Storage Adapter Plugin Template
+# grammY Encrypted Storage
 
-This repository provides a template for creating grammY plugins that leverage the `StorageAdapter` interface for data persistence. It includes a complete example of a "text vault" plugin, demonstrating how to store, retrieve, and manage user-specific data.
+An enhanced storage adapter for the grammY framework that adds encryption to any existing `StorageAdapter`. This plugin encrypts data before writing to storage and decrypts it when reading, ensuring your bot's stored data remains secure.
 
-## Overview
+## Features
 
-This template is designed to help you build your own grammY storage-based plugins. The included `vault` plugin serves as a practical example, showcasing the following capabilities:
-
-- **Storage Agnostic**: Works with any `StorageAdapter` implementation from grammY.
-- **User-Specific Data**: Demonstrates how to handle data storage on a per-user basis.
-- **CRUD Operations**: Provides a full example of creating, reading, updating, and deleting data.
-- **TypeScript Support**: The code is fully typed.
-- **Testing**: Includes a comprehensive test suite.
+- **🔐 Encryption by Default**: Built-in AES-GCM encryption using Web Crypto API
+- **🔌 Pluggable Encryption**: Bring your own encryption implementation via the `EncryptionProvider` interface
+- **🔄 Storage Agnostic**: Works with any existing grammY `StorageAdapter`
+- **🛡️ Type-Safe**: Fully typed with TypeScript
+- **✅ Well-Tested**: Comprehensive test suite included
+- **📦 Zero Dependencies**: Uses standard Web Crypto API (Deno/Node.js compatible)
 
 ## Quick Start
 
-To use the `vault` plugin in your bot, you need to install and configure it with a storage adapter.
+### Basic Usage with Default Encryption
 
 ```typescript
-import { Bot, MemorySessionStorage } from "grammy";
-import { vault, type VaultData } from "./src/mod.ts";
+import { Bot, Context, MemorySessionStorage, session } from "grammy";
+import { EncryptedStorageAdapter } from "./src/mod.ts";
 
 const bot = new Bot("YOUR_BOT_TOKEN");
 
-// Install the vault plugin with a storage adapter
-bot.use(vault({
-  storage: new MemorySessionStorage<VaultData>(),
+interface SessionData {
+  counter: number;
+}
+
+// Wrap any storage adapter with encryption
+const encryptedStorage = new EncryptedStorageAdapter<SessionData>({
+  storage: new MemorySessionStorage<string>(),
+  password: "your-secret-password",
+});
+
+// Use with session middleware
+bot.use(session({
+  initial: () => ({ counter: 0 }),
+  storage: encryptedStorage,
+}));
+```
+
+### Using Custom Encryption
+
+Implement the `EncryptionProvider` interface to use your own encryption:
+
+```typescript
+import { EncryptedStorageAdapter, EncryptionProvider } from "./src/mod.ts";
+
+class MyCustomEncryption implements EncryptionProvider {
+  async encrypt(data: string): Promise<string> {
+    // Your encryption logic
+    return myEncrypt(data);
+  }
+
+  async decrypt(encrypted: string): Promise<string> {
+    // Your decryption logic
+    return myDecrypt(encrypted);
+  }
+}
+
+const storage = new EncryptedStorageAdapter({
+  storage: new MemorySessionStorage<string>(),
+  encryptionProvider: new MyCustomEncryption(),
+});
+```
+
+## Example Usage
+
+This plugin includes a complete example demonstrating encrypted sessions:
+
+```typescript
+import { Bot, Context, MemorySessionStorage, session } from "grammy";
+import { EncryptedStorageAdapter } from "./src/mod.ts";
+
+const bot = new Bot("YOUR_BOT_TOKEN");
+
+interface SessionData {
+  counter: number;
+  notes: string[];
+}
+
+interface MyContext extends Context {
+  session: SessionData;
+}
+
+// Use encrypted storage for sessions
+const encryptedStorage = new EncryptedStorageAdapter<SessionData>({
+  storage: new MemorySessionStorage<string>(),
+  password: "my-secret-key",
+});
+
+bot.use(session({
+  initial: (): SessionData => ({ counter: 0, notes: [] }),
+  storage: encryptedStorage,
 }));
 
-// Example: Save text to the vault
-bot.command("save", (ctx) => {
-  const text = ctx.match;
-  if (!text) return ctx.reply("Please provide text to save.");
-
-  ctx.vault.entries.push({
-    id: crypto.randomUUID(),
-    text,
-    createdAt: Date.now(),
-  });
-  ctx.reply("Saved to your vault!");
+// Example: Increment counter
+bot.command("count", (ctx) => {
+  ctx.session.counter++;
+  ctx.reply(`Counter: ${ctx.session.counter}`);
 });
 
-// Example: List all entries
-bot.command("list", (ctx) => {
-  if (ctx.vault.entries.length === 0) {
-    return ctx.reply("Your vault is empty.");
+// Example: Add note
+bot.command("note", (ctx) => {
+  const text = ctx.match.trim();
+  if (!text) return ctx.reply("Please provide text for the note.");
+
+  ctx.session.notes.push(text);
+  ctx.reply("Note saved and encrypted!");
+});
+
+// Example: List notes
+bot.command("notes", (ctx) => {
+  if (ctx.session.notes.length === 0) {
+    return ctx.reply("You have no notes yet.");
   }
-  const list = ctx.vault.entries
-    .map((e, i) => `${i + 1}. ${e.text}`)
+  const list = ctx.session.notes
+    .map((note, i) => `${i + 1}. ${note}`)
     .join("\n");
-  ctx.reply(`Your vault:\n\n${list}`);
-});
-
-// Example: Delete an entry
-bot.command("delete", (ctx) => {
-  const id = ctx.match;
-  const index = ctx.vault.entries.findIndex((e) => e.id.startsWith(id));
-  if (index === -1) return ctx.reply("Entry not found.");
-  ctx.vault.entries.splice(index, 1);
-  ctx.reply("Deleted!");
+  ctx.reply(`Your notes:\n\n${list}`);
 });
 
 bot.start();
 ```
 
+## API Reference
+
+### `EncryptedStorageAdapter<T>`
+
+The main class that wraps any `StorageAdapter` to add encryption.
+
+**Constructor Options:**
+
+The adapter accepts a discriminated union type for compile-time safety:
+
+```typescript
+// Option 1: Password-based encryption
+type EncryptedStorageWithPasswordOptions<T> = {
+  storage: StorageAdapter<string>;
+  password: string;
+  salt?: string;
+  iterations?: number; // Default: 600000, min: 600000
+};
+
+// Option 2: Custom encryption provider
+type EncryptedStorageWithProviderOptions<T> = {
+  storage: StorageAdapter<string>;
+  encryptionProvider: EncryptionProvider;
+};
+
+type EncryptedStorageOptions<T> =
+  | EncryptedStorageWithPasswordOptions<T>
+  | EncryptedStorageWithProviderOptions<T>;
+```
+
+**Type Safety**: The discriminated union ensures at compile-time that either `password` or `encryptionProvider` is provided, but not both.
+
+### `EncryptionProvider` Interface
+
+Implement this interface to provide custom encryption:
+
+```typescript
+interface EncryptionProvider {
+  encrypt(data: string): Promise<string> | string;
+  decrypt(encrypted: string): Promise<string> | string;
+}
+```
+
+### `DefaultEncryptionProvider`
+
+The default encryption implementation using AES-GCM with PBKDF2 key derivation:
+
+```typescript
+// Using options object (recommended)
+const provider = new DefaultEncryptionProvider({
+  password: "your-password", // Required: encryption password
+  salt: "custom-salt", // Optional: salt for key derivation
+  iterations: 600000, // Optional: PBKDF2 iterations (default: 600000, min: 600000)
+});
+
+// Backward compatible: using positional parameters
+const provider = new DefaultEncryptionProvider(
+  "password", // Required: encryption password
+  "custom-salt", // Optional: salt for key derivation
+);
+```
+
+**Security Features:**
+
+- AES-GCM 256-bit encryption
+- PBKDF2 key derivation with configurable iterations (default: 600000, min: 600000)
+- Random IV for each encryption operation
+- SHA-256 hashing
+
+**Recommended Iterations:** 600000 or higher based on latest OWASP recommendations (2023+). Higher values provide better security but slower performance.
+
 ## Running the Example
 
-An example bot is provided in `example.ts`. To run it:
+An example bot is provided in `examples/encrypted.ts`. To run it:
 
 1. Set your bot token as an environment variable:
    ```bash
@@ -73,61 +203,75 @@ An example bot is provided in `example.ts`. To run it:
    ```
 2. Run the example file:
    ```bash
-   deno run --allow-net --allow-env example.ts
+   deno run --allow-net --allow-env examples/encrypted.ts
    ```
 
-The example bot supports the following commands: `/start`, `/save <text>`, `/list`, `/delete <id>`, `/clear`, and `/count`.
+The example bot supports encrypted session storage with commands: `/start`, `/count`, `/note <text>`, `/notes`, and `/clear`.
 
-## Persistent Storage
+## Persistent Storage Examples
 
-This plugin template is compatible with any `StorageAdapter`. Here are a few examples using storage adapters from `@grammyjs/storage`:
+The encrypted storage adapter works with any `StorageAdapter`. Here are examples using various storage backends:
 
 ```typescript
-// PostgreSQL
+// PostgreSQL with encryption
 import { PostgresAdapter } from "@grammyjs/storage-postgres";
-bot.use(vault({
+import { EncryptedStorageAdapter } from "./src/mod.ts";
+
+const encryptedPostgres = new EncryptedStorageAdapter({
   storage: new PostgresAdapter({
     host: "localhost",
     database: "mybot",
   }),
-}));
+  password: "encryption-key",
+});
 
-// Redis
+bot.use(session({ storage: encryptedPostgres }));
+
+// Redis with encryption
 import { RedisAdapter } from "@grammyjs/storage-redis";
-bot.use(vault({
-  storage: new RedisAdapter({ url: "redis://localhost:6379" }),
-}));
 
-// File System
+const encryptedRedis = new EncryptedStorageAdapter({
+  storage: new RedisAdapter({ url: "redis://localhost:6379" }),
+  password: "encryption-key",
+});
+
+bot.use(session({ storage: encryptedRedis }));
+
+// File System with encryption
 import { FileAdapter } from "@grammyjs/storage-file";
-bot.use(vault({
+
+const encryptedFile = new EncryptedStorageAdapter({
   storage: new FileAdapter({ dirName: "vault-data" }),
-}));
+  password: "encryption-key",
+});
+
+bot.use(session({ storage: encryptedFile }));
 ```
 
 ## Customization
 
-### Data Structure
+### Custom Encryption Algorithm
 
-You can modify the data structure stored by the plugin by editing the `VaultData` interface in `src/plugin.ts`.
+Create your own encryption by implementing the `EncryptionProvider` interface:
 
 ```typescript
-export interface VaultData {
-  entries: VaultEntry[];
-  // Add your own properties here
+import { EncryptionProvider } from "./src/mod.ts";
+
+class MyEncryption implements EncryptionProvider {
+  async encrypt(data: string): Promise<string> {
+    // Use any encryption library or algorithm
+    return await yourEncryptionMethod(data);
+  }
+
+  async decrypt(encrypted: string): Promise<string> {
+    return await yourDecryptionMethod(encrypted);
+  }
 }
-```
 
-### Storage Key
-
-By default, data is stored on a per-user basis. You can change this behavior by providing a `getStorageKey` function.
-
-```typescript
-// Store data per chat
-bot.use(vault({
-  storage: myStorage,
-  getStorageKey: (ctx) => ctx.chat?.id.toString(),
-}));
+const storage = new EncryptedStorageAdapter({
+  storage: myStorageAdapter,
+  encryptionProvider: new MyEncryption(),
+});
 ```
 
 ## Development
@@ -145,13 +289,15 @@ This project includes several Deno tasks to help with development:
 ```
 .
 ├── src/
-│   ├── mod.ts          # Main exports
-│   └── plugin.ts       # Vault plugin implementation
+│   ├── mod.ts                # Main exports
+│   ├── encryption.ts         # Encryption interface and default implementation
+│   └── encrypted-adapter.ts  # Encrypted storage adapter
 ├── test/
-│   └── plugin_test.ts  # Test suite
-├── example.ts          # Example bot
-├── deno.json           # Deno configuration
-└── README.md           # This file
+│   └── encryption_test.ts    # Test suite
+├── examples/
+│   └── encrypted.ts          # Example bot
+├── deno.json                 # Deno configuration
+└── README.md                 # This file
 ```
 
 ## License
