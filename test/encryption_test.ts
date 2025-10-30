@@ -94,6 +94,56 @@ describe("Encryption Provider", () => {
       // Different salts should result in incompatible encryption
       await expect(provider2.decrypt(encrypted)).rejects.toThrow();
     });
+
+    it("should accept custom iterations", async () => {
+      const provider = new DefaultEncryptionProvider({
+        password: "test-password",
+        iterations: 400000,
+      });
+      const original = "Test data";
+
+      const encrypted = await provider.encrypt(original);
+      const decrypted = await provider.decrypt(encrypted);
+
+      expect(decrypted).toBe(original);
+    });
+
+    it("should reject iterations below minimum", () => {
+      expect(() => {
+        new DefaultEncryptionProvider({
+          password: "test-password",
+          iterations: 100000,
+        });
+      }).toThrow(/at least 310000/i);
+    });
+
+    it("should default to 310000 iterations", async () => {
+      const provider1 = new DefaultEncryptionProvider({
+        password: "password",
+        salt: "salt",
+      });
+      const provider2 = new DefaultEncryptionProvider({
+        password: "password",
+        salt: "salt",
+        iterations: 310000,
+      });
+      const original = "Test data";
+
+      const encrypted1 = await provider1.encrypt(original);
+      const decrypted2 = await provider2.decrypt(encrypted1);
+
+      expect(decrypted2).toBe(original);
+    });
+
+    it("should support backward compatible constructor", async () => {
+      const provider = new DefaultEncryptionProvider("password", "salt");
+      const original = "Test data";
+
+      const encrypted = await provider.encrypt(original);
+      const decrypted = await provider.decrypt(encrypted);
+
+      expect(decrypted).toBe(original);
+    });
   });
 
   describe("Custom EncryptionProvider", () => {
@@ -319,6 +369,28 @@ describe("EncryptedStorageAdapter", () => {
       await storage.write("key1", { data: "test" });
       const result = await storage.read("key1");
       expect(result).toEqual({ data: "test" });
+    });
+
+    it("should accept custom iterations", async () => {
+      const storage = new EncryptedStorageAdapter({
+        storage: new MemorySessionStorage<string>(),
+        password: "test",
+        iterations: 500000,
+      });
+
+      await storage.write("key1", { data: "test" });
+      const result = await storage.read("key1");
+      expect(result).toEqual({ data: "test" });
+    });
+
+    it("should reject iterations below minimum", () => {
+      expect(() => {
+        new EncryptedStorageAdapter({
+          storage: new MemorySessionStorage<string>(),
+          password: "test",
+          iterations: 100000,
+        });
+      }).toThrow(/at least 310000/i);
     });
   });
 });

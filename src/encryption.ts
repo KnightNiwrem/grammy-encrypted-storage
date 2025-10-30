@@ -19,6 +19,32 @@ export interface EncryptionProvider {
 }
 
 /**
+ * Options for configuring the DefaultEncryptionProvider.
+ */
+export interface DefaultEncryptionOptions {
+  /**
+   * Password for encryption/decryption.
+   */
+  password: string;
+
+  /**
+   * Optional salt for key derivation (should be consistent for the same dataset).
+   */
+  salt?: string;
+
+  /**
+   * Number of PBKDF2 iterations for key derivation.
+   * Must be at least 310000. Defaults to 310000.
+   * Higher values provide better security but slower performance.
+   * Recommended range: 310000-600000.
+   */
+  iterations?: number;
+}
+
+const MIN_ITERATIONS = 310000;
+const DEFAULT_ITERATIONS = 310000;
+
+/**
  * Default encryption provider using Web Crypto API with AES-GCM.
  * Uses a password-based key derivation (PBKDF2) to generate encryption keys.
  */
@@ -27,16 +53,42 @@ export class DefaultEncryptionProvider implements EncryptionProvider {
 
   /**
    * Creates a new default encryption provider.
-   * @param password The password to use for encryption/decryption
-   * @param salt Optional salt for key derivation (should be consistent for the same dataset)
+   * @param options Configuration options or password string (for backward compatibility)
+   * @param salt Optional salt (only used if first parameter is a string)
    */
-  constructor(password: string, salt?: string) {
-    this.key = this.deriveKey(password, salt ?? "grammy-storage");
+  constructor(
+    options: DefaultEncryptionOptions | string,
+    salt?: string,
+  ) {
+    let password: string;
+    let actualSalt: string;
+    let iterations: number;
+
+    if (typeof options === "string") {
+      // Backward compatibility: constructor(password, salt?)
+      password = options;
+      actualSalt = salt ?? "grammy-storage";
+      iterations = DEFAULT_ITERATIONS;
+    } else {
+      // New style: constructor(options)
+      password = options.password;
+      actualSalt = options.salt ?? "grammy-storage";
+      iterations = options.iterations ?? DEFAULT_ITERATIONS;
+
+      if (iterations < MIN_ITERATIONS) {
+        throw new Error(
+          `PBKDF2 iterations must be at least ${MIN_ITERATIONS} for security. Provided: ${iterations}`,
+        );
+      }
+    }
+
+    this.key = this.deriveKey(password, actualSalt, iterations);
   }
 
   private async deriveKey(
     password: string,
     salt: string,
+    iterations: number,
   ): Promise<CryptoKey> {
     const encoder = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
@@ -51,7 +103,7 @@ export class DefaultEncryptionProvider implements EncryptionProvider {
       {
         name: "PBKDF2",
         salt: encoder.encode(salt),
-        iterations: 100000,
+        iterations,
         hash: "SHA-256",
       },
       keyMaterial,

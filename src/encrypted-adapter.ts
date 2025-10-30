@@ -31,6 +31,15 @@ export interface EncryptedStorageOptions<T> {
    * Only used if encryptionProvider is not provided.
    */
   salt?: string;
+
+  /**
+   * Number of PBKDF2 iterations for key derivation.
+   * Only used if encryptionProvider is not provided.
+   * Must be at least 310000. Defaults to 310000.
+   * Higher values provide better security but slower performance.
+   * Recommended range: 310000-600000.
+   */
+  iterations?: number;
 }
 
 /**
@@ -74,10 +83,11 @@ export class EncryptedStorageAdapter<T> implements StorageAdapter<T> {
     if (options.encryptionProvider) {
       this.encryptionProvider = options.encryptionProvider;
     } else if (options.password) {
-      this.encryptionProvider = new DefaultEncryptionProvider(
-        options.password,
-        options.salt,
-      );
+      this.encryptionProvider = new DefaultEncryptionProvider({
+        password: options.password,
+        salt: options.salt,
+        iterations: options.iterations,
+      });
     } else {
       throw new Error(
         "Either encryptionProvider or password must be provided",

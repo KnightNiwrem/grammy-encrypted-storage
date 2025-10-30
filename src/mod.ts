@@ -11,6 +11,7 @@ export { EncryptedStorageAdapter } from "./encrypted-adapter.ts";
 export type { EncryptedStorageOptions } from "./encrypted-adapter.ts";
 
 export {
+  type DefaultEncryptionOptions,
   DefaultEncryptionProvider,
   type EncryptionProvider,
 } from "./encryption.ts";

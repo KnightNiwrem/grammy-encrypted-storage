@@ -135,6 +135,7 @@ interface EncryptedStorageOptions<T> {
   storage: StorageAdapter<string>; // Underlying storage adapter
   password?: string; // Password for default encryption
   salt?: string; // Optional salt for key derivation
+  iterations?: number; // Optional PBKDF2 iterations (default: 310000, min: 310000)
   encryptionProvider?: EncryptionProvider; // Custom encryption implementation
 }
 ```
@@ -157,6 +158,14 @@ interface EncryptionProvider {
 The default encryption implementation using AES-GCM with PBKDF2 key derivation:
 
 ```typescript
+// Using options object (recommended)
+const provider = new DefaultEncryptionProvider({
+  password: "your-password", // Required: encryption password
+  salt: "custom-salt", // Optional: salt for key derivation
+  iterations: 400000, // Optional: PBKDF2 iterations (default: 310000, min: 310000)
+});
+
+// Backward compatible: using positional parameters
 const provider = new DefaultEncryptionProvider(
   "password", // Required: encryption password
   "custom-salt", // Optional: salt for key derivation
@@ -166,9 +175,11 @@ const provider = new DefaultEncryptionProvider(
 **Security Features:**
 
 - AES-GCM 256-bit encryption
-- PBKDF2 key derivation with 100,000 iterations
+- PBKDF2 key derivation with configurable iterations (default: 310000, min: 310000)
 - Random IV for each encryption operation
 - SHA-256 hashing
+
+**Recommended Iterations:** 310000-600000. Higher values provide better security but slower performance.
 
 ## Running the Example
 
