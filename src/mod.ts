@@ -8,7 +8,11 @@
  */
 
 export { EncryptedStorageAdapter } from "./encrypted-adapter.ts";
-export type { EncryptedStorageOptions } from "./encrypted-adapter.ts";
+export type {
+  EncryptedStorageOptions,
+  EncryptedStorageWithPasswordOptions,
+  EncryptedStorageWithProviderOptions,
+} from "./encrypted-adapter.ts";
 
 export {
   type DefaultEncryptionOptions,

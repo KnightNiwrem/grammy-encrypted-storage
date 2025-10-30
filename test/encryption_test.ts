@@ -375,12 +375,35 @@ describe("EncryptedStorageAdapter", () => {
   });
 
   describe("Configuration", () => {
-    it("should require either password or encryptionProvider", () => {
-      expect(() => {
-        new EncryptedStorageAdapter({
-          storage: new MemorySessionStorage<string>(),
-        });
-      }).toThrow(/password/i);
+    it("should work with password-based encryption", async () => {
+      const storage = new EncryptedStorageAdapter({
+        storage: new MemorySessionStorage<string>(),
+        password: "test",
+      });
+
+      await storage.write("key1", { data: "test" });
+      const result = await storage.read("key1");
+      expect(result).toEqual({ data: "test" });
+    });
+
+    it("should work with custom encryption provider", async () => {
+      class TestEncryption implements EncryptionProvider {
+        encrypt(data: string): string {
+          return btoa(data);
+        }
+        decrypt(encrypted: string): string {
+          return atob(encrypted);
+        }
+      }
+
+      const storage = new EncryptedStorageAdapter({
+        storage: new MemorySessionStorage<string>(),
+        encryptionProvider: new TestEncryption(),
+      });
+
+      await storage.write("key1", { data: "test" });
+      const result = await storage.read("key1");
+      expect(result).toEqual({ data: "test" });
     });
 
     it("should accept custom salt", async () => {

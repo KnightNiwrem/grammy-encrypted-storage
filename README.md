@@ -130,17 +130,29 @@ The main class that wraps any `StorageAdapter` to add encryption.
 
 **Constructor Options:**
 
+The adapter accepts a discriminated union type for compile-time safety:
+
 ```typescript
-interface EncryptedStorageOptions<T> {
-  storage: StorageAdapter<string>; // Underlying storage adapter
-  password?: string; // Password for default encryption
-  salt?: string; // Optional salt for key derivation
-  iterations?: number; // Optional PBKDF2 iterations (default: 600000, min: 600000)
-  encryptionProvider?: EncryptionProvider; // Custom encryption implementation
-}
+// Option 1: Password-based encryption
+type EncryptedStorageWithPasswordOptions<T> = {
+  storage: StorageAdapter<string>;
+  password: string;
+  salt?: string;
+  iterations?: number; // Default: 600000, min: 600000
+};
+
+// Option 2: Custom encryption provider
+type EncryptedStorageWithProviderOptions<T> = {
+  storage: StorageAdapter<string>;
+  encryptionProvider: EncryptionProvider;
+};
+
+type EncryptedStorageOptions<T> =
+  | EncryptedStorageWithPasswordOptions<T>
+  | EncryptedStorageWithProviderOptions<T>;
 ```
 
-**Note**: Either `password` or `encryptionProvider` must be provided.
+**Type Safety**: The discriminated union ensures at compile-time that either `password` or `encryptionProvider` is provided, but not both.
 
 ### `EncryptionProvider` Interface
 

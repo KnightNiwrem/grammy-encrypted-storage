@@ -5,9 +5,9 @@ import {
 } from "./encryption.ts";
 
 /**
- * Options for configuring the encrypted storage adapter.
+ * Options for configuring the encrypted storage adapter with a custom encryption provider.
  */
-export interface EncryptedStorageOptions<T> {
+export interface EncryptedStorageWithProviderOptions<T> {
   /**
    * The underlying storage adapter to use for persistence.
    * Data will be encrypted before being written to this storage.
@@ -15,32 +15,47 @@ export interface EncryptedStorageOptions<T> {
   storage: StorageAdapter<string>;
 
   /**
-   * Optional custom encryption provider.
-   * If not provided, DefaultEncryptionProvider will be used.
+   * Custom encryption provider.
    */
-  encryptionProvider?: EncryptionProvider;
+  encryptionProvider: EncryptionProvider;
+}
+
+/**
+ * Options for configuring the encrypted storage adapter with password-based encryption.
+ */
+export interface EncryptedStorageWithPasswordOptions<T> {
+  /**
+   * The underlying storage adapter to use for persistence.
+   * Data will be encrypted before being written to this storage.
+   */
+  storage: StorageAdapter<string>;
 
   /**
    * Password for the default encryption provider.
-   * Required if encryptionProvider is not provided.
    */
-  password?: string;
+  password: string;
 
   /**
    * Optional salt for the default encryption provider.
-   * Only used if encryptionProvider is not provided.
    */
   salt?: string;
 
   /**
    * Number of PBKDF2 iterations for key derivation.
-   * Only used if encryptionProvider is not provided.
    * Must be at least 600000. Defaults to 600000.
    * Higher values provide better security but slower performance.
    * Recommended: 600000 or higher based on latest OWASP recommendations.
    */
   iterations?: number;
 }
+
+/**
+ * Options for configuring the encrypted storage adapter.
+ * Either provide an encryptionProvider OR a password (with optional salt and iterations).
+ */
+export type EncryptedStorageOptions<T> =
+  | EncryptedStorageWithProviderOptions<T>
+  | EncryptedStorageWithPasswordOptions<T>;
 
 /**
  * An enhanced storage adapter that encrypts data before writing and decrypts after reading.
@@ -80,18 +95,14 @@ export class EncryptedStorageAdapter<T> implements StorageAdapter<T> {
   constructor(options: EncryptedStorageOptions<T>) {
     this.storage = options.storage;
 
-    if (options.encryptionProvider) {
+    if ("encryptionProvider" in options) {
       this.encryptionProvider = options.encryptionProvider;
-    } else if (options.password) {
+    } else {
       this.encryptionProvider = new DefaultEncryptionProvider({
         password: options.password,
         salt: options.salt,
         iterations: options.iterations,
       });
-    } else {
-      throw new Error(
-        "Either encryptionProvider or password must be provided",
-      );
     }
   }
 
